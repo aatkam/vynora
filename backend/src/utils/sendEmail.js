@@ -1,44 +1,27 @@
-import nodemailer from 'nodemailer';
+const BREVO_EMAIL_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
+const EMAIL_TIMEOUT_MS = 10000;
 
-let transporter;
-
-function getTransporter() {
-  if (transporter) {
-    return transporter;
-  }
-
+function getEmailConfig() {
   const {
-    SMTP_HOST,
-    SMTP_PORT,
-    SMTP_USER,
-    SMTP_PASS
+    BREVO_API_KEY,
+    BREVO_SENDER_EMAIL,
+    BREVO_SENDER_NAME = 'Vynora'
   } = process.env;
 
   /*
-   * During local development SMTP is optional.
-   * The reset link will appear directly on the page.
+   * Email delivery is optional during local development.
+   * When these values are missing, forgot-password falls back to
+   * showing the reset URL locally (never in production).
    */
-  if (
-    !SMTP_HOST ||
-    !SMTP_PORT ||
-    !SMTP_USER ||
-    !SMTP_PASS
-  ) {
+  if (!BREVO_API_KEY || !BREVO_SENDER_EMAIL) {
     return null;
   }
 
-  transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: Number(SMTP_PORT),
-    secure: Number(SMTP_PORT) === 465,
-
-    auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS
-    }
-  });
-
-  return transporter;
+  return {
+    apiKey: BREVO_API_KEY,
+    senderEmail: BREVO_SENDER_EMAIL,
+    senderName: BREVO_SENDER_NAME
+  };
 }
 
 export async function sendPasswordResetEmail({
@@ -46,32 +29,73 @@ export async function sendPasswordResetEmail({
   name,
   resetUrl
 }) {
-  const mailer = getTransporter();
+  const config = getEmailConfig();
 
-  if (!mailer) {
+  if (!config) {
     return false;
   }
 
-  await mailer.sendMail({
-    from:
-      process.env.MAIL_FROM ||
-      process.env.SMTP_USER,
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    EMAIL_TIMEOUT_MS
+  );
 
-    to,
+  try {
+    const response = await fetch(BREVO_EMAIL_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'api-key': config.apiKey
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        sender: {
+          name: config.senderName,
+          email: config.senderEmail
+        },
+        to: [
+          {
+            email: to,
+            name
+          }
+        ],
+        subject: 'Reset your Vynora password',
+        textContent: [
+          `Hello ${name},`,
+          '',
+          'A password reset was requested for your Vynora account.',
+          '',
+          'Open this link within 15 minutes:',
+          resetUrl,
+          '',
+          'If you did not request this reset, ignore this email.'
+        ].join('\n')
+      })
+    });
 
-    subject: 'Reset your Vynora password',
+    if (!response.ok) {
+      const details = await response
+        .text()
+        .catch(() => '');
 
-    text: [
-      `Hello ${name},`,
-      '',
-      'A password reset was requested for your Vynora account.',
-      '',
-      'Open this link within 15 minutes:',
-      resetUrl,
-      '',
-      'If you did not request this reset, ignore this email.'
-    ].join('\n')
-  });
+      console.error(
+        `Brevo email API error (${response.status}):`,
+        details || response.statusText
+      );
 
-  return true;
+      throw new Error('Email provider rejected the request');
+    }
+
+    return true;
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('Email provider request timed out');
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
