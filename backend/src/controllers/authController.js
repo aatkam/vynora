@@ -14,19 +14,34 @@ function normalizeEmail(value = '') {
   return value.trim().toLowerCase();
 }
 
+function isStrongPassword(password = '') {
+  return (
+    password.length >= 8 &&
+    /[A-Z]/.test(password) &&
+    /[a-z]/.test(password) &&
+    /[0-9]/.test(password) &&
+    /[^A-Za-z0-9]/.test(password)
+  );
+}
+
+const STRONG_PASSWORD_MESSAGE =
+  'Password must be at least 8 characters and include uppercase, lowercase, number and special character';
+
 export const register = asyncHandler(async (req, res) => {
   const { name, username, email, password } = req.body;
 
   if (!name || !username || !email || !password) {
     res.status(400);
+
     throw new Error(
       'Name, username, email and password are required'
     );
   }
 
-  if (password.length < 6) {
+  // Strong password validation for registration
+  if (!isStrongPassword(password)) {
     res.status(400);
-    throw new Error('Password must be at least 6 characters');
+    throw new Error(STRONG_PASSWORD_MESSAGE);
   }
 
   const cleanUsername = normalizeUsername(username);
@@ -69,7 +84,10 @@ export const login = asyncHandler(async (req, res) => {
     email: normalizeEmail(email)
   }).select('+password');
 
-  if (!user || !(await user.matchPassword(password || ''))) {
+  if (
+    !user ||
+    !(await user.matchPassword(password || ''))
+  ) {
     res.status(401);
     throw new Error('Invalid email or password');
   }
@@ -120,6 +138,7 @@ export const forgotPassword = asyncHandler(
       .digest('hex');
 
     user.resetPasswordToken = hashedToken;
+
     user.resetPasswordExpiresAt = new Date(
       Date.now() + RESET_TOKEN_TTL_MS
     );
@@ -137,11 +156,12 @@ export const forgotPassword = asyncHandler(
       `${clientUrl}/reset-password/${rawToken}`;
 
     try {
-      const emailSent = await sendPasswordResetEmail({
-        to: user.email,
-        name: user.name,
-        resetUrl
-      });
+      const emailSent =
+        await sendPasswordResetEmail({
+          to: user.email,
+          name: user.name,
+          resetUrl
+        });
 
       if (!emailSent) {
         console.log(
@@ -157,7 +177,8 @@ export const forgotPassword = asyncHandler(
           : 'Development mode: open the reset link shown below.',
 
         /*
-         * The reset URL is returned only during local development.
+         * The reset URL is returned only during
+         * local development.
          */
         ...(emailSent ||
         process.env.NODE_ENV === 'production'
@@ -193,12 +214,10 @@ export const resetPassword = asyncHandler(
       );
     }
 
-    if (password.length < 6) {
+    // Strong password validation for password reset
+    if (!isStrongPassword(password)) {
       res.status(400);
-
-      throw new Error(
-        'Password must be at least 6 characters'
-      );
+      throw new Error(STRONG_PASSWORD_MESSAGE);
     }
 
     if (password !== confirmPassword) {

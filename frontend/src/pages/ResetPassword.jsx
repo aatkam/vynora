@@ -15,6 +15,22 @@ import {
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
+function getPasswordChecks(password = '') {
+  return {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    special: /[^A-Za-z0-9]/.test(password)
+  };
+}
+
+function isStrongPassword(password = '') {
+  const checks = getPasswordChecks(password);
+
+  return Object.values(checks).every(Boolean);
+}
+
 export default function ResetPassword() {
   const { token } = useParams();
 
@@ -33,6 +49,10 @@ export default function ResetPassword() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  const passwordChecks = getPasswordChecks(
+    form.password
+  );
+
   function change(event) {
     setForm({
       ...form,
@@ -45,7 +65,17 @@ export default function ResetPassword() {
 
     setError('');
 
-    if (form.password !== form.confirmPassword) {
+    if (!isStrongPassword(form.password)) {
+      setError(
+        'Password must be at least 8 characters and include an uppercase letter, lowercase letter, number and special character.'
+      );
+
+      return;
+    }
+
+    if (
+      form.password !== form.confirmPassword
+    ) {
       setError('Passwords do not match');
       return;
     }
@@ -66,7 +96,7 @@ export default function ResetPassword() {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-        'Could not reset password'
+          'Could not reset password'
       );
     } finally {
       setBusy(false);
@@ -89,11 +119,13 @@ export default function ResetPassword() {
             Secure reset
           </span>
 
-          <h1>Create a fresh password.</h1>
+          <h1>
+            Create a fresh password.
+          </h1>
 
           <p>
-            Choose a password you do not use on
-            another account.
+            Choose a password you do not use
+            on another account.
           </p>
         </div>
       </section>
@@ -108,11 +140,15 @@ export default function ResetPassword() {
               Almost finished
             </span>
 
-            <h2>Set a new password</h2>
+            <h2>
+              Set a new password
+            </h2>
 
             <p>
-              Your new password must contain at
-              least six characters.
+              Use at least 8 characters with
+              an uppercase letter, lowercase
+              letter, number and special
+              character.
             </p>
           </div>
 
@@ -130,8 +166,8 @@ export default function ResetPassword() {
                 value={form.password}
                 onChange={change}
                 required
-                minLength={6}
-                placeholder="At least 6 characters"
+                minLength={8}
+                placeholder="Create a strong password"
               />
 
               <button
@@ -156,6 +192,83 @@ export default function ResetPassword() {
             </span>
           </label>
 
+          <div
+            className="password-requirements"
+            style={{
+              display: 'grid',
+              gap: '5px',
+              fontSize: '0.86rem',
+              marginTop: '-6px'
+            }}
+          >
+            <span
+              style={{
+                opacity: passwordChecks.length
+                  ? 1
+                  : 0.65
+              }}
+            >
+              {passwordChecks.length
+                ? '✓'
+                : '○'}{' '}
+              At least 8 characters
+            </span>
+
+            <span
+              style={{
+                opacity:
+                  passwordChecks.uppercase
+                    ? 1
+                    : 0.65
+              }}
+            >
+              {passwordChecks.uppercase
+                ? '✓'
+                : '○'}{' '}
+              One uppercase letter
+            </span>
+
+            <span
+              style={{
+                opacity:
+                  passwordChecks.lowercase
+                    ? 1
+                    : 0.65
+              }}
+            >
+              {passwordChecks.lowercase
+                ? '✓'
+                : '○'}{' '}
+              One lowercase letter
+            </span>
+
+            <span
+              style={{
+                opacity: passwordChecks.number
+                  ? 1
+                  : 0.65
+              }}
+            >
+              {passwordChecks.number
+                ? '✓'
+                : '○'}{' '}
+              One number
+            </span>
+
+            <span
+              style={{
+                opacity: passwordChecks.special
+                  ? 1
+                  : 0.65
+              }}
+            >
+              {passwordChecks.special
+                ? '✓'
+                : '○'}{' '}
+              One special character
+            </span>
+          </div>
+
           <label>
             Confirm new password
 
@@ -169,7 +282,7 @@ export default function ResetPassword() {
               value={form.confirmPassword}
               onChange={change}
               required
-              minLength={6}
+              minLength={8}
               placeholder="Repeat your new password"
             />
           </label>
