@@ -13,41 +13,19 @@ import { protect } from '../middleware/auth.js';
 
 const router = Router();
 
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skipSuccessfulRequests: true,
-
-  message: {
-    message:
-      'Too many failed sign-in attempts. Please try again later.'
-  }
-});
-
 const passwordResetLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 5,
   standardHeaders: true,
   legacyHeaders: false,
-
   message: {
     message:
       'Too many password reset attempts. Please try again later.'
   }
 });
 
-router.post(
-  '/register',
-  register
-);
-
-router.post(
-  '/login',
-  loginLimiter,
-  login
-);
+router.post('/register', register);
+router.post('/login', login);
 
 router.post(
   '/forgot-password',
@@ -61,10 +39,6 @@ router.post(
   resetPassword
 );
 
-router.get(
-  '/me',
-  protect,
-  me
-);
+router.get('/me', protect, me);
 
 export default router;

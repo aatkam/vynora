@@ -6,56 +6,42 @@ import { createToken } from '../utils/token.js';
 
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
 
-const PASSWORD_RULE_MESSAGE =
-  'Password must be at least 8 characters and include uppercase, lowercase, a number and a special character';
-
-function normalizeIdentifier(value = '') {
-  return String(value).trim().toLowerCase();
-}
-
 function normalizeUsername(value = '') {
-  return normalizeIdentifier(value);
+  return value.trim().toLowerCase();
 }
 
 function normalizeEmail(value = '') {
-  return normalizeIdentifier(value);
+  return value.trim().toLowerCase();
 }
 
 function isStrongPassword(password = '') {
   return (
-    typeof password === 'string' &&
     password.length >= 8 &&
-    /[a-z]/.test(password) &&
     /[A-Z]/.test(password) &&
-    /\d/.test(password) &&
+    /[a-z]/.test(password) &&
+    /[0-9]/.test(password) &&
     /[^A-Za-z0-9]/.test(password)
   );
 }
 
-function findByIdentifier(identifier) {
-  const cleanIdentifier = normalizeIdentifier(identifier);
-
-  return User.findOne({
-    $or: [
-      { email: cleanIdentifier },
-      { username: cleanIdentifier }
-    ]
-  });
-}
+const STRONG_PASSWORD_MESSAGE =
+  'Password must be at least 8 characters and include uppercase, lowercase, number and special character';
 
 export const register = asyncHandler(async (req, res) => {
   const { name, username, email, password } = req.body;
 
   if (!name || !username || !email || !password) {
     res.status(400);
+
     throw new Error(
       'Name, username, email and password are required'
     );
   }
 
+  // Strong password validation for registration
   if (!isStrongPassword(password)) {
     res.status(400);
-    throw new Error(PASSWORD_RULE_MESSAGE);
+    throw new Error(STRONG_PASSWORD_MESSAGE);
   }
 
   const cleanUsername = normalizeUsername(username);
@@ -92,29 +78,18 @@ export const register = asyncHandler(async (req, res) => {
 });
 
 export const login = asyncHandler(async (req, res) => {
-  const identifier = normalizeIdentifier(
-    req.body.identifier ||
-    req.body.email ||
-    req.body.username
-  );
+  const { email, password } = req.body;
 
-  const password = req.body.password || '';
+  const user = await User.findOne({
+    email: normalizeEmail(email)
+  }).select('+password');
 
-  if (!identifier || !password) {
-    res.status(400);
-    throw new Error(
-      'Email/username and password are required'
-    );
-  }
-
-  const user = await findByIdentifier(identifier)
-    .select('+password');
-
-  if (!user || !(await user.matchPassword(password))) {
+  if (
+    !user ||
+    !(await user.matchPassword(password || ''))
+  ) {
     res.status(401);
-    throw new Error(
-      'Invalid email/username or password'
-    );
+    throw new Error('Invalid email or password');
   }
 
   res.json({
@@ -131,27 +106,21 @@ export const me = asyncHandler(async (req, res) => {
 
 export const forgotPassword = asyncHandler(
   async (req, res) => {
-    const identifier = normalizeIdentifier(
-      req.body.identifier ||
-      req.body.email ||
-      req.body.username
-    );
+    const email = normalizeEmail(req.body.email);
 
-    if (!identifier) {
+    if (!email) {
       res.status(400);
-      throw new Error(
-        'Email or username is required'
-      );
+      throw new Error('Email is required');
     }
 
     const genericMessage =
-      'If an account exists for that email or username, password reset instructions will be sent to its registered email.';
+      'If an account exists for that email, password reset instructions have been prepared.';
 
-    const user = await findByIdentifier(identifier);
+    const user = await User.findOne({ email });
 
     /*
-     * Do not reveal whether the account exists.
-     * This prevents username/email enumeration.
+     * Return the same message when no user is found.
+     * This prevents people from checking which emails are registered.
      */
     if (!user) {
       return res.json({
@@ -207,6 +176,10 @@ export const forgotPassword = asyncHandler(
           ? genericMessage
           : 'Development mode: open the reset link shown below.',
 
+        /*
+         * The reset URL is returned only during
+         * local development.
+         */
         ...(emailSent ||
         process.env.NODE_ENV === 'production'
           ? {}
@@ -220,11 +193,6 @@ export const forgotPassword = asyncHandler(
         validateBeforeSave: false
       });
 
-      console.error(
-        'Password reset email error:',
-        error
-      );
-
       res.status(500);
 
       throw new Error(
@@ -236,10 +204,7 @@ export const forgotPassword = asyncHandler(
 
 export const resetPassword = asyncHandler(
   async (req, res) => {
-    const {
-      password,
-      confirmPassword
-    } = req.body;
+    const { password, confirmPassword } = req.body;
 
     if (!password || !confirmPassword) {
       res.status(400);
@@ -249,16 +214,16 @@ export const resetPassword = asyncHandler(
       );
     }
 
+    // Strong password validation for password reset
     if (!isStrongPassword(password)) {
       res.status(400);
-      throw new Error(PASSWORD_RULE_MESSAGE);
+      throw new Error(STRONG_PASSWORD_MESSAGE);
     }
 
     if (password !== confirmPassword) {
       res.status(400);
-      throw new Error(
-        'Passwords do not match'
-      );
+
+      throw new Error('Passwords do not match');
     }
 
     const hashedToken = crypto
@@ -285,7 +250,6 @@ export const resetPassword = asyncHandler(
     }
 
     user.password = password;
-
     user.resetPasswordToken = undefined;
     user.resetPasswordExpiresAt = undefined;
 
