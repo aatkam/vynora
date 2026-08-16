@@ -1,5 +1,11 @@
-import { Eye, EyeOff, Sparkles } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  Sparkles
+} from 'lucide-react';
+
 import { useState } from 'react';
+
 import {
   Link,
   Navigate,
@@ -7,73 +13,88 @@ import {
 } from 'react-router-dom';
 
 import api from '../api/client';
-import { useAuth } from '../context/AuthContext';
 
-function getPasswordChecks(password = '') {
-  return {
-    length: password.length >= 8,
-    uppercase: /[A-Z]/.test(password),
-    lowercase: /[a-z]/.test(password),
-    number: /[0-9]/.test(password),
-    special: /[^A-Za-z0-9]/.test(password)
-  };
-}
+import {
+  useAuth
+} from '../context/AuthContext';
+
+const PASSWORD_RULE_MESSAGE =
+  'Use at least 8 characters with uppercase, lowercase, a number and a special character.';
 
 function isStrongPassword(password = '') {
-  const checks = getPasswordChecks(password);
-
-  return Object.values(checks).every(Boolean);
+  return (
+    password.length >= 8 &&
+    /[a-z]/.test(password) &&
+    /[A-Z]/.test(password) &&
+    /\d/.test(password) &&
+    /[^A-Za-z0-9]/.test(password)
+  );
 }
 
-export default function AuthPage({ mode }) {
-  const isRegister = mode === 'register';
+export default function AuthPage({
+  mode
+}) {
+  const isRegister =
+    mode === 'register';
 
-  const { user, authenticate } = useAuth();
+  const {
+    user,
+    authenticate
+  } = useAuth();
+
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
     name: '',
     username: '',
     email: '',
+    identifier: '',
     password: ''
   });
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [
+    showPassword,
+    setShowPassword
+  ] = useState(false);
+
+  const [
+    error,
+    setError
+  ] = useState('');
+
+  const [
+    busy,
+    setBusy
+  ] = useState(false);
 
   if (user) {
-    return <Navigate to="/" replace />;
+    return (
+      <Navigate
+        to="/"
+        replace
+      />
+    );
   }
-
-  const passwordChecks = getPasswordChecks(
-    form.password
-  );
 
   function change(event) {
     setForm({
       ...form,
-      [event.target.name]: event.target.value
+      [event.target.name]:
+        event.target.value
     });
   }
 
   async function submit(event) {
     event.preventDefault();
+
     setError('');
 
-    /*
-     * Strong password validation is only applied
-     * when a new account is being created.
-     *
-     * Login must continue accepting passwords that
-     * were created before the new password rules.
-     */
     if (
       isRegister &&
       !isStrongPassword(form.password)
     ) {
       setError(
-        'Password must be at least 8 characters and include an uppercase letter, lowercase letter, number and special character.'
+        PASSWORD_RULE_MESSAGE
       );
 
       return;
@@ -82,28 +103,39 @@ export default function AuthPage({ mode }) {
     setBusy(true);
 
     try {
-      const endpoint = isRegister
-        ? '/auth/register'
-        : '/auth/login';
+      const endpoint =
+        isRegister
+          ? '/auth/register'
+          : '/auth/login';
 
-      const payload = isRegister
-        ? form
-        : {
-            email: form.email,
-            password: form.password
-          };
+      const payload =
+        isRegister
+          ? {
+              name: form.name,
+              username: form.username,
+              email: form.email,
+              password: form.password
+            }
+          : {
+              identifier:
+                form.identifier,
+              password:
+                form.password
+            };
 
-      const { data } = await api.post(
-        endpoint,
-        payload
-      );
+      const { data } =
+        await api.post(
+          endpoint,
+          payload
+        );
 
       authenticate(data);
+
       navigate('/');
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          'Something went wrong'
+        'Something went wrong'
       );
     } finally {
       setBusy(false);
@@ -127,17 +159,21 @@ export default function AuthPage({ mode }) {
           </span>
 
           <h1>
-            Share your perspective. Find your people.
+            Share your perspective.
+            Find your people.
           </h1>
 
           <p>
-            A calmer social platform for real ideas,
-            meaningful progress and everyday moments.
+            A calmer social platform
+            for real ideas, meaningful
+            progress and everyday
+            moments.
           </p>
         </div>
 
         <div className="floating-note note-one">
-          “Building something new today ✨”
+          “Building something new
+          today ✨”
         </div>
 
         <div className="floating-note note-two">
@@ -164,7 +200,7 @@ export default function AuthPage({ mode }) {
             <p>
               {isRegister
                 ? 'Start sharing with your own circle.'
-                : 'Your feed is ready when you are.'}
+                : 'Use your email or username to continue.'}
             </p>
           </div>
 
@@ -179,6 +215,7 @@ export default function AuthPage({ mode }) {
                   onChange={change}
                   required
                   maxLength={60}
+                  autoComplete="name"
                   placeholder="Your full name"
                 />
               </label>
@@ -194,24 +231,48 @@ export default function AuthPage({ mode }) {
                   minLength={3}
                   maxLength={24}
                   pattern="[a-zA-Z0-9_]+"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   placeholder="your_username"
+                />
+              </label>
+
+              <label>
+                Email address
+
+                <input
+                  type="email"
+                  name="email"
+                  value={form.email}
+                  onChange={change}
+                  required
+                  autoComplete="email"
+                  placeholder="you@example.com"
                 />
               </label>
             </>
           )}
 
-          <label>
-            Email address
+          {!isRegister && (
+            <label>
+              Email or username
 
-            <input
-              type="email"
-              name="email"
-              value={form.email}
-              onChange={change}
-              required
-              placeholder="you@example.com"
-            />
-          </label>
+              <input
+                type="text"
+                name="identifier"
+                value={
+                  form.identifier
+                }
+                onChange={change}
+                required
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoComplete="username"
+                placeholder="you@example.com or username"
+              />
+            </label>
+          )}
 
           <label>
             Password
@@ -228,12 +289,17 @@ export default function AuthPage({ mode }) {
                 onChange={change}
                 required
                 minLength={
-                  isRegister ? 8 : undefined
+                  isRegister ? 8 : 1
+                }
+                autoComplete={
+                  isRegister
+                    ? 'new-password'
+                    : 'current-password'
                 }
                 placeholder={
                   isRegister
                     ? 'Create a strong password'
-                    : 'Enter your password'
+                    : 'Your password'
                 }
               />
 
@@ -241,7 +307,8 @@ export default function AuthPage({ mode }) {
                 type="button"
                 onClick={() =>
                   setShowPassword(
-                    (current) => !current
+                    current =>
+                      !current
                   )
                 }
                 aria-label={
@@ -260,82 +327,19 @@ export default function AuthPage({ mode }) {
           </label>
 
           {isRegister && (
-            <div
-              className="password-requirements"
+            <p
               style={{
-                display: 'grid',
-                gap: '5px',
-                fontSize: '0.86rem',
-                marginTop: '-6px'
+                color:
+                  'var(--muted)',
+                fontSize: '.8rem',
+                margin:
+                  '-8px 0 0'
               }}
             >
-              <span
-                style={{
-                  opacity: passwordChecks.length
-                    ? 1
-                    : 0.65
-                }}
-              >
-                {passwordChecks.length
-                  ? '✓'
-                  : '○'}{' '}
-                At least 8 characters
-              </span>
-
-              <span
-                style={{
-                  opacity:
-                    passwordChecks.uppercase
-                      ? 1
-                      : 0.65
-                }}
-              >
-                {passwordChecks.uppercase
-                  ? '✓'
-                  : '○'}{' '}
-                One uppercase letter
-              </span>
-
-              <span
-                style={{
-                  opacity:
-                    passwordChecks.lowercase
-                      ? 1
-                      : 0.65
-                }}
-              >
-                {passwordChecks.lowercase
-                  ? '✓'
-                  : '○'}{' '}
-                One lowercase letter
-              </span>
-
-              <span
-                style={{
-                  opacity: passwordChecks.number
-                    ? 1
-                    : 0.65
-                }}
-              >
-                {passwordChecks.number
-                  ? '✓'
-                  : '○'}{' '}
-                One number
-              </span>
-
-              <span
-                style={{
-                  opacity: passwordChecks.special
-                    ? 1
-                    : 0.65
-                }}
-              >
-                {passwordChecks.special
-                  ? '✓'
-                  : '○'}{' '}
-                One special character
-              </span>
-            </div>
+              {
+                PASSWORD_RULE_MESSAGE
+              }
+            </p>
           )}
 
           {!isRegister && (

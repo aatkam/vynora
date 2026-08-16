@@ -1,27 +1,72 @@
-const BREVO_EMAIL_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
-const EMAIL_TIMEOUT_MS = 10000;
+import nodemailer from 'nodemailer';
 
-function getEmailConfig() {
+let transporter;
+
+function parseBoolean(value) {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized =
+    value.trim().toLowerCase();
+
+  if (normalized === 'true') {
+    return true;
+  }
+
+  if (normalized === 'false') {
+    return false;
+  }
+
+  return undefined;
+}
+
+function getTransporter() {
+  if (transporter) {
+    return transporter;
+  }
+
   const {
-    BREVO_API_KEY,
-    BREVO_SENDER_EMAIL,
-    BREVO_SENDER_NAME = 'Vynora'
+    SMTP_HOST,
+    SMTP_PORT,
+    SMTP_SECURE,
+    SMTP_USER,
+    SMTP_PASS
   } = process.env;
 
-  /*
-   * Email delivery is optional during local development.
-   * When these values are missing, forgot-password falls back to
-   * showing the reset URL locally (never in production).
-   */
-  if (!BREVO_API_KEY || !BREVO_SENDER_EMAIL) {
+  if (
+    !SMTP_HOST ||
+    !SMTP_PORT ||
+    !SMTP_USER ||
+    !SMTP_PASS
+  ) {
     return null;
   }
 
-  return {
-    apiKey: BREVO_API_KEY,
-    senderEmail: BREVO_SENDER_EMAIL,
-    senderName: BREVO_SENDER_NAME
-  };
+  const port =
+    Number(SMTP_PORT);
+
+  const configuredSecure =
+    parseBoolean(
+      SMTP_SECURE
+    );
+
+  transporter =
+    nodemailer.createTransport({
+      host: SMTP_HOST,
+      port,
+
+      secure:
+        configuredSecure ??
+        port === 465,
+
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS
+      }
+    });
+
+  return transporter;
 }
 
 export async function sendPasswordResetEmail({
@@ -29,73 +74,44 @@ export async function sendPasswordResetEmail({
   name,
   resetUrl
 }) {
-  const config = getEmailConfig();
+  const mailer =
+    getTransporter();
 
-  if (!config) {
+  if (!mailer) {
     return false;
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(
-    () => controller.abort(),
-    EMAIL_TIMEOUT_MS
-  );
+  const info =
+    await mailer.sendMail({
+      from:
+        process.env.MAIL_FROM ||
+        process.env.SMTP_USER,
 
-  try {
-    const response = await fetch(BREVO_EMAIL_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        accept: 'application/json',
-        'content-type': 'application/json',
-        'api-key': config.apiKey
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        sender: {
-          name: config.senderName,
-          email: config.senderEmail
-        },
-        to: [
-          {
-            email: to,
-            name
-          }
-        ],
-        subject: 'Reset your Vynora password',
-        textContent: [
-          `Hello ${name},`,
-          '',
-          'A password reset was requested for your Vynora account.',
-          '',
-          'Open this link within 15 minutes:',
-          resetUrl,
-          '',
-          'If you did not request this reset, ignore this email.'
-        ].join('\n')
-      })
+      to,
+
+      subject:
+        'Reset your Vynora password',
+
+      text: [
+        `Hello ${name},`,
+        '',
+        'A password reset was requested for your Vynora account.',
+        '',
+        'Open this link within 15 minutes:',
+        resetUrl,
+        '',
+        'If you did not request this reset, ignore this email.'
+      ].join('\n')
     });
 
-    if (!response.ok) {
-      const details = await response
-        .text()
-        .catch(() => '');
-
-      console.error(
-        `Brevo email API error (${response.status}):`,
-        details || response.statusText
-      );
-
-      throw new Error('Email provider rejected the request');
-    }
-
-    return true;
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      throw new Error('Email provider request timed out');
-    }
-
-    throw error;
-  } finally {
-    clearTimeout(timeout);
+  if (
+    Array.isArray(info.rejected) &&
+    info.rejected.length > 0
+  ) {
+    throw new Error(
+      'SMTP rejected the password reset recipient'
+    );
   }
+
+  return true;
 }

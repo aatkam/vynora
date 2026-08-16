@@ -13,50 +13,62 @@ import {
 } from 'react-router-dom';
 
 import api from '../api/client';
-import { useAuth } from '../context/AuthContext';
 
-function getPasswordChecks(password = '') {
-  return {
-    length: password.length >= 8,
-    uppercase: /[A-Z]/.test(password),
-    lowercase: /[a-z]/.test(password),
-    number: /[0-9]/.test(password),
-    special: /[^A-Za-z0-9]/.test(password)
-  };
-}
+import {
+  useAuth
+} from '../context/AuthContext';
+
+const PASSWORD_RULE_MESSAGE =
+  'Use at least 8 characters with uppercase, lowercase, a number and a special character.';
 
 function isStrongPassword(password = '') {
-  const checks = getPasswordChecks(password);
-
-  return Object.values(checks).every(Boolean);
+  return (
+    password.length >= 8 &&
+    /[a-z]/.test(password) &&
+    /[A-Z]/.test(password) &&
+    /\d/.test(password) &&
+    /[^A-Za-z0-9]/.test(password)
+  );
 }
 
 export default function ResetPassword() {
   const { token } = useParams();
 
-  const { authenticate } = useAuth();
+  const {
+    authenticate
+  } = useAuth();
 
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
 
-  const [form, setForm] = useState({
+  const [
+    form,
+    setForm
+  ] = useState({
     password: '',
     confirmPassword: ''
   });
 
-  const [showPassword, setShowPassword] =
-    useState(false);
+  const [
+    showPassword,
+    setShowPassword
+  ] = useState(false);
 
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [
+    busy,
+    setBusy
+  ] = useState(false);
 
-  const passwordChecks = getPasswordChecks(
-    form.password
-  );
+  const [
+    error,
+    setError
+  ] = useState('');
 
   function change(event) {
     setForm({
       ...form,
-      [event.target.name]: event.target.value
+      [event.target.name]:
+        event.target.value
     });
   }
 
@@ -65,28 +77,37 @@ export default function ResetPassword() {
 
     setError('');
 
-    if (!isStrongPassword(form.password)) {
+    if (
+      !isStrongPassword(
+        form.password
+      )
+    ) {
       setError(
-        'Password must be at least 8 characters and include an uppercase letter, lowercase letter, number and special character.'
+        PASSWORD_RULE_MESSAGE
       );
 
       return;
     }
 
     if (
-      form.password !== form.confirmPassword
+      form.password !==
+      form.confirmPassword
     ) {
-      setError('Passwords do not match');
+      setError(
+        'Passwords do not match'
+      );
+
       return;
     }
 
     setBusy(true);
 
     try {
-      const { data } = await api.post(
-        `/auth/reset-password/${token}`,
-        form
-      );
+      const { data } =
+        await api.post(
+          `/auth/reset-password/${token}`,
+          form
+        );
 
       authenticate(data);
 
@@ -96,7 +117,7 @@ export default function ResetPassword() {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          'Could not reset password'
+        'Could not reset password'
       );
     } finally {
       setBusy(false);
@@ -124,8 +145,9 @@ export default function ResetPassword() {
           </h1>
 
           <p>
-            Choose a password you do not use
-            on another account.
+            Choose a password you
+            do not use on another
+            account.
           </p>
         </div>
       </section>
@@ -145,10 +167,9 @@ export default function ResetPassword() {
             </h2>
 
             <p>
-              Use at least 8 characters with
-              an uppercase letter, lowercase
-              letter, number and special
-              character.
+              {
+                PASSWORD_RULE_MESSAGE
+              }
             </p>
           </div>
 
@@ -163,10 +184,13 @@ export default function ResetPassword() {
                     : 'password'
                 }
                 name="password"
-                value={form.password}
+                value={
+                  form.password
+                }
                 onChange={change}
                 required
                 minLength={8}
+                autoComplete="new-password"
                 placeholder="Create a strong password"
               />
 
@@ -174,7 +198,8 @@ export default function ResetPassword() {
                 type="button"
                 onClick={() =>
                   setShowPassword(
-                    (current) => !current
+                    current =>
+                      !current
                   )
                 }
                 aria-label={
@@ -192,83 +217,6 @@ export default function ResetPassword() {
             </span>
           </label>
 
-          <div
-            className="password-requirements"
-            style={{
-              display: 'grid',
-              gap: '5px',
-              fontSize: '0.86rem',
-              marginTop: '-6px'
-            }}
-          >
-            <span
-              style={{
-                opacity: passwordChecks.length
-                  ? 1
-                  : 0.65
-              }}
-            >
-              {passwordChecks.length
-                ? '✓'
-                : '○'}{' '}
-              At least 8 characters
-            </span>
-
-            <span
-              style={{
-                opacity:
-                  passwordChecks.uppercase
-                    ? 1
-                    : 0.65
-              }}
-            >
-              {passwordChecks.uppercase
-                ? '✓'
-                : '○'}{' '}
-              One uppercase letter
-            </span>
-
-            <span
-              style={{
-                opacity:
-                  passwordChecks.lowercase
-                    ? 1
-                    : 0.65
-              }}
-            >
-              {passwordChecks.lowercase
-                ? '✓'
-                : '○'}{' '}
-              One lowercase letter
-            </span>
-
-            <span
-              style={{
-                opacity: passwordChecks.number
-                  ? 1
-                  : 0.65
-              }}
-            >
-              {passwordChecks.number
-                ? '✓'
-                : '○'}{' '}
-              One number
-            </span>
-
-            <span
-              style={{
-                opacity: passwordChecks.special
-                  ? 1
-                  : 0.65
-              }}
-            >
-              {passwordChecks.special
-                ? '✓'
-                : '○'}{' '}
-              One special character
-            </span>
-          </div>
-
           <label>
             Confirm new password
 
@@ -279,10 +227,13 @@ export default function ResetPassword() {
                   : 'password'
               }
               name="confirmPassword"
-              value={form.confirmPassword}
+              value={
+                form.confirmPassword
+              }
               onChange={change}
               required
               minLength={8}
+              autoComplete="new-password"
               placeholder="Repeat your new password"
             />
           </label>

@@ -1,19 +1,41 @@
 import {
-  Mail,
+  AtSign,
   Sparkles
 } from 'lucide-react';
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+
+import {
+  Link
+} from 'react-router-dom';
 
 import api from '../api/client';
 
 export default function ForgotPassword() {
-  const [email, setEmail] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-  const [resetUrl, setResetUrl] = useState('');
+  const [
+    identifier,
+    setIdentifier
+  ] = useState('');
+
+  const [
+    busy,
+    setBusy
+  ] = useState(false);
+
+  const [
+    error,
+    setError
+  ] = useState('');
+
+  const [
+    message,
+    setMessage
+  ] = useState('');
+
+  const [
+    resetUrl,
+    setResetUrl
+  ] = useState('');
 
   async function submit(event) {
     event.preventDefault();
@@ -24,13 +46,21 @@ export default function ForgotPassword() {
     setResetUrl('');
 
     try {
-      const { data } = await api.post(
-        '/auth/forgot-password',
-        { email }
+      const { data } =
+        await api.post(
+          '/auth/forgot-password',
+          {
+            identifier
+          }
+        );
+
+      setMessage(
+        data.message
       );
 
-      setMessage(data.message);
-      setResetUrl(data.resetUrl || '');
+      setResetUrl(
+        data.resetUrl || ''
+      );
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -58,13 +88,17 @@ export default function ForgotPassword() {
           </span>
 
           <h1>
-            Let’s get you back into Vynora.
+            Let’s get you back
+            into Vynora.
           </h1>
 
           <p>
-            Enter the email attached to your
-            account and we will prepare a secure
-            password reset link.
+            Enter your email or
+            username. If the account
+            exists, Vynora will send
+            a secure reset link to
+            the email saved on that
+            account.
           </p>
         </div>
       </section>
@@ -79,30 +113,38 @@ export default function ForgotPassword() {
               Forgot password
             </span>
 
-            <h2>Reset your password</h2>
+            <h2>
+              Reset your password
+            </h2>
 
             <p>
-              Use the email address you registered
-              with.
+              You can use either
+              your registered email
+              or your username.
             </p>
           </div>
 
           <label>
-            Email address
+            Email or username
 
             <span className="password-field">
               <input
-                type="email"
-                value={email}
-                onChange={(event) =>
-                  setEmail(event.target.value)
+                type="text"
+                value={identifier}
+                onChange={event =>
+                  setIdentifier(
+                    event.target.value
+                  )
                 }
                 required
-                placeholder="you@example.com"
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoComplete="username"
+                placeholder="you@example.com or username"
               />
 
               <span className="field-icon">
-                <Mail size={18} />
+                <AtSign size={18} />
               </span>
             </span>
           </label>

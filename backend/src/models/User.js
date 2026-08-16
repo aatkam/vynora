@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
-      minlength: 6,
+      minlength: 8,
       select: false
     },
 
@@ -92,29 +92,44 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.pre('save', async function () {
-  if (!this.isModified('password')) return;
+  if (!this.isModified('password')) {
+    return;
+  }
 
-  this.password = await bcrypt.hash(this.password, 12);
+  this.password = await bcrypt.hash(
+    this.password,
+    12
+  );
 });
 
-userSchema.methods.matchPassword = function (candidate) {
-  return bcrypt.compare(candidate, this.password);
-};
-
-userSchema.methods.toSafeObject = function () {
-  return {
-    id: this._id,
-    name: this.name,
-    username: this.username,
-    email: this.email,
-    bio: this.bio,
-    location: this.location,
-    avatar: this.avatar,
-    coverImage: this.coverImage,
-    followersCount: this.followers.length,
-    followingCount: this.following.length,
-    createdAt: this.createdAt
+userSchema.methods.matchPassword =
+  function (candidate) {
+    return bcrypt.compare(
+      candidate,
+      this.password
+    );
   };
-};
 
-export default mongoose.model('User', userSchema);
+userSchema.methods.toSafeObject =
+  function () {
+    return {
+      id: this._id,
+      name: this.name,
+      username: this.username,
+      email: this.email,
+      bio: this.bio,
+      location: this.location,
+      avatar: this.avatar,
+      coverImage: this.coverImage,
+      followersCount:
+        this.followers?.length || 0,
+      followingCount:
+        this.following?.length || 0,
+      createdAt: this.createdAt
+    };
+  };
+
+export default mongoose.model(
+  'User',
+  userSchema
+);
